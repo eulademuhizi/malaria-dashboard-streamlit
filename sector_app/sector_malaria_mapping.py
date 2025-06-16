@@ -5,6 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
+import gdown
 
 # Page configuration
 st.set_page_config(
@@ -69,34 +70,40 @@ st.markdown("""
 
 @st.cache_data
 def load_data():
-    """Load the malaria sector data with performance optimizations"""
+    """Download and load malaria sector data from Google Drive every time."""
     try:
+        file_id = "14kwr57ZCNp6XCpaFcNhXMU7a5EStCmsK"
+        url = f"https://drive.google.com/uc?id={file_id}"
+
+        st.info("Downloading sector_malaria.geojson from Google Drive...")
+        output = "sector_malaria.geojson"
+        gdown.download(url, output, quiet=False)
+
         # Load the GeoJSON file
-        sector_data = gpd.read_file('sector_malaria.geojson')
-        
+        sector_data = gpd.read_file(output)
+
         # Ensure numeric columns are properly typed
         numeric_columns = ['Simple malaria cases', 'incidence', 'Population', 'year']
         for col in numeric_columns:
             sector_data[col] = pd.to_numeric(sector_data[col], errors='coerce').fillna(0)
-        
-        # Create unique sector names for disambiguation
+
+        # Create unique sector display names
         sector_data['sector_display'] = sector_data.apply(
             lambda row: f"{row['Sector']} ({row['District']})", axis=1
         )
-        
-        # Pre-calculate some commonly used aggregations for performance
+
+        # Create a sector key for grouping
         sector_data['sector_key'] = sector_data['Sector'] + '_' + sector_data['District']
-        
-        # Precompute sector options here to avoid hashing issues later
-        sector_options = sector_data[['Sector', 'District', 'sector_display', 'sector_key']].drop_duplicates()
-        sector_options = sorted(sector_options['sector_display'].tolist())
-        
-        return sector_data, sector_options  # Return both data and options
-    except FileNotFoundError:
-        st.error("sector_malaria.geojson file not found. Please ensure the file is in the correct directory.")
-        return None, []
+
+        # Get sorted unique sector display options
+        sector_options = sorted(
+            sector_data[['sector_display']].drop_duplicates()['sector_display'].tolist()
+        )
+
+        return sector_data, sector_options
+
     except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
+        st.error(f"Error loading data: {e}")
         return None, []
 
 @st.cache_data
